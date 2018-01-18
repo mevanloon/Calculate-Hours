@@ -1,42 +1,42 @@
 (function() {
-  var app = Application('Calendar')
-  app.includeStandardAdditions = true
+  calendar = Application('Calendar')
+	calendar.includeStandardAdditions = true
 
-  var requestedCalendar = app.chooseFromList(getCalendars(), {withTitle: 'What calendar should I search in?'})
-  var requestedTerm = app.displayDialog('What term would you like to use to count hours?', {defaultAnswer: ''}).textReturned
-
-  function getCalendars() {
-    return app.calendars().map(n => n.name())
-  }
-  function getCalendar(requestedCalendar) {
-    var cal
-    app.calendars().map(val => (val.name() == requestedCalendar ? cal = val : ''))
-    return cal
-  }
-  function getEvents(requestedTerm, cal) {
-    var events = []
-    Progress.totalUnitCount = cal.events().length
-    Progress.completedUnitCount = 0
-
-    cal.events().map(function(val) {
-      Progress.completedUnitCount++
-      if(val.summary().match(requestedTerm)) {
-        events.push((val.endDate() - val.startDate()) / 1000 / 60 / 60)
-      }
-    })
-    return events
-  }
-  function getTotalHours(events) {
-    var total = 0
-    events.map(i => total += i)
-    return total
+  var requestedCalendar = calendar.chooseFromList(calendar.calendars().map(c=>c.name()), {withTitle: 'What calendar should be searched for events?'})
+  if(requestedCalendar === false) {
+    return false
   }
 
-  var events = getEvents(requestedTerm, getCalendar(requestedCalendar))
-  var totalHours = getTotalHours(events)
-  var resultString = `${totalHours} hours spent, spread amongst ${events.length} items. Requested term was '${requestedTerm}'`
+	const requestedPeriod = calendar.displayDialog('What period should be used for the query?', {defaultAnswer: '2017-05-01 2017-12-31'}).textReturned
+  if(requestedPeriod === false) {
+    return false
+  }
 
-  app.displayAlert(resultString)
+  var requestedTerm = calendar.displayDialog('What term would you like to use to count hours?', {defaultAnswer: ''}).textReturned
+  return requestedTerm
+  if(requestedPeriod === false) {
+    return false
+  }
+  
+	const periods = requestedPeriod.match(/([0-9\-]+)\s([0-9\-]+)/)
+	const periodStart = periods && periods.length === 3 ? new Date(periods[1]) : new Date(0)
+	const periodEnd = periods && periods.length === 3 ? new Date(periods[2]) : new Date()
 
-  return resultString
+  const selectedCalendar = calendar.calendars[requestedCalendar]
+  const numberOfEvents = selectedCalendar.events().length
+  Progress.totalUnitCount = numberOfEvents
+  Progress.completedUnitCount = 0
+
+  const events = selectedCalendar.events()
+    .filter(e => { Progress.completedUnitCount++; return e.startDate()/1 >= periodStart/1 && e.endDate()/1 <= periodEnd/1 })
+    .map(e => { return new Date(e.endDate()/1 - e.startDate()/1)/1000/60/60 })
+
+  const totalHours = events.reduce((a, e) => a+e)
+
+  // Return the results
+	var resultString = `${totalHours} hours spent, spread amongst ${numberOfEvents} items. Requested term was '${requestedTerm}'`
+
+	calendar.displayAlert(resultString)
+
+	return resultString
 })()
